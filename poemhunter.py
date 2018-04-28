@@ -37,12 +37,13 @@ class PoemHunter(object):
         futures = {}
         page_no = 1
         while True:
-            # nth page URL format: https://www.poemhunter.com/poet-name/poems/page-n
+            # nth page URL format:
+            # https://www.poemhunter.com/poet-name/poems/page-n
             try:
                 page = requests.get(poem_url_base + f'page-{page_no}')
             except IOError:
-                print('Error loading page');
-                break;
+                print('Error loading page')
+                break
             if not page.content:
                 break
 
@@ -89,7 +90,7 @@ class PoemHunter(object):
         except IOError as exc:
             # For now (TODO).
             print(f'Could not save "{title}":', exc)
-            return False;
+            return False
 
         self.downloaded_poems.append(title)
         return True
@@ -122,9 +123,9 @@ class PoemHunter(object):
     def _format_poem(self, title, lines):
         """Removes artifacts and appends title and author to the poem."""
         if lines:
-            # For some reason there are a \r\n chars at the beginning of the first
-            # line and in the last line and at the end of the second last line line,
-            # so trim these.
+            # For some reason there are a \r\n chars at the beginning of the
+            # first line and in the last line and at the end of the second last
+            # line line, so trim these.
             lines[0] = lines[0].lstrip()
             lines[-1] = lines[-1].strip()
             if not lines[-1]:
