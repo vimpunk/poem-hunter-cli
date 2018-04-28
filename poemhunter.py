@@ -12,130 +12,139 @@ import requests
 HOST = 'https://www.poemhunter.com'
 
 
-def fetch_poem(url):
-    """
-    Downloads and returns each line of the poem as a separate string
-    in a list.
-    """
+class PoemHunter(object):
+    def __init__(self, poet, dest, concurrency):
+        self.poet = poet
+        self.dest = dest
+        self.downloaded_poems = []
+        self._executor = ThreadPoolExecutor(concurrency)
 
-    # URL format: https://www.poemhunter.com/poem/poem-title/
-    page = requests.get(url)
-    if page.content:
-        dom = html.fromstring(page.content)
+        if self.poet.lower() not in self.dest.lower():
+            self.dest += '/' + self.poet
+            if not os.path.exists(self.dest):
+                os.makedirs(self.dest)
 
-        lines = []
-        p = dom.xpath(
-                '/html/body/div[1]/div[6]/div[3]/div/div[1]/div[2]/div[1]/p')
-        if p:
-            lines.append(p[0].text)
-            brs = p[0].xpath('br')
-            for br in brs:
-                if br.tail:
-                    lines.append(br.tail)
-                else:
-                    lines.append('')
-        return lines
-    else:
-        return ""
+    def run(self):
+        """Conccurently fetches and saves all poems of poet.
 
+        poet -- A string of the full name of the poet.
+        dest -- A valid path at which to save the poems.
+        concurrency -- An integer specifying how many threads should be used.
+        """
 
-def save_poem(title, poem, path):
-    with open(path + '/' + title, 'w') as f:
-        for line in poem:
-            f.write(line + '\n')
+        # Format poet name as used in the URL.
+        poem_url_base = HOST + '/' + self.poet.lower().replace(' ', '-') + '/poems/'
+        futures = {}
+        page_no = 1
+        while True:
+            # nth page URL format: https://www.poemhunter.com/poet-name/poems/page-n
+            try:
+                page = requests.get(poem_url_base + f'page-{page_no}')
+            except IOError:
+                print('Error loading page');
+                break;
+            if not page.content:
+                break
 
+            dom = html.fromstring(page.content)
 
-def format_poem(poet, title, lines):
-    if lines:
-        # For some reason there are a \r\n chars at the beginning of the first
-        # line and in the last line and at the end of the second last line line,
-        # so trim these.
-        lines[0] = lines[0].lstrip()
-        lines[-1] = lines[-1].strip()
-        if not lines[-1]:
-            del lines[-1]
-        lines[-1] = lines[-1].strip()
+            poem_titles = dom.xpath('//*[@class="poems"]/tbody/tr/td[2]/a')
+            for title in poem_titles:
+                future = self._executor.submit(
+                        self.download_poem,
+                        title.text,
+                        HOST + title.attrib['href'])
+                futures[future] = title.text
 
-        # Insert header (title), footer (poet) and blanks in between.
-        lines.insert(0, title)
-        lines.insert(1, '')
-        lines.insert(1, '')
-        lines.append('')
-        lines.append('')
-        lines.append(poet)
-    return lines
+            next_page = dom.xpath('//*[@class="next"]/a')
+            if not next_page:
+                break
+            page_no += 1
 
+        for future in as_completed(futures.keys()):
+            if future.result():
+                title = futures[future]
+                print(f'"{title}" saved.')
 
-def download_poem(poet, title, url, dest):
-    """
-    Fetches poem from poemhunter.com and saves it.
+    def download_poem(self, title, url):
+        """Fetches poem from poemhunter.com and saves it.
 
-    poet -- The full name of the poet.
-    title -- title of the poem
-    url -- full URL of the poem
-    dest -- valid path to the directory where the poem is to be saved
-    """
+        poet -- The full name of the poet.
+        title -- title of the poem
+        url -- full URL of the poem
+        dest -- valid path to the directory where the poem is to be saved
+        """
 
-    poem = fetch_poem(url)
-    poem = format_poem(poet, title, poem)
-    save_poem(title, poem, dest)
-    # Signal that this poem was accepted and saved. This may change in the
-    # future in that a poem might not be saved.
-    return True
+        if title in self.downloaded_poems:
+            return False
 
-
-def run(poet, dest, concurrency):
-    """
-    Conccurently fetches and saves all poems of poet.
-    
-    poet -- A string of the full name of the poet.
-    dest -- A valid path at which to save the poems.
-    concurrency -- An integer specifying how many threads should be used.
-    """
-
-    if poet.lower() not in dest.lower():
-        dest += '/' + poet
-        if not os.path.exists(dest):
-            os.makedirs(dest)
-
-    # Format poet name as used in the URL.
-    poem_url_base = HOST + '/' + poet.lower().replace(' ', '-') + '/poems/'
-
-    executor = ThreadPoolExecutor(concurrency)
-    futures = {}
-
-    page_no = 1
-    while True:
-        # nth page URL format: https://www.poemhunter.com/poet-name/poems/page-n
         try:
-            page = requests.get(poem_url_base + f'page-{page_no}')
-        except IOError:
-            print('Error loading page');
-            break;
-        if not page.content:
-            break
+            poem = self._fetch_poem(url)
+        except IOError as exc:
+            print(f'Could not download "{title}":', exc)
+            return False
 
-        dom = html.fromstring(page.content)
+        try:
+            self._save_poem(title, self._format_poem(title, poem))
+        except IOError as exc:
+            # For now (TODO).
+            print(f'Could not save "{title}":', exc)
+            return False;
 
-        poem_titles = dom.xpath('//*[@class="poems"]/tbody/tr/td[2]/a')
-        for title in poem_titles:
-            future = executor.submit(
-                    download_poem,
-                    poet,
-                    title.text,
-                    HOST + title.attrib['href'],
-                    dest)
-            futures[future] = title.text
+        self.downloaded_poems.append(title)
+        return True
 
-        next_page = dom.xpath('//*[@class="next"]/a')
-        if not next_page:
-            break
-        page_no += 1
+    def _fetch_poem(self, url):
+        """Downloads and returns each line of the poem as a separate string in
+        a list.
+        """
 
-    for future in as_completed(futures.keys()):
-        title = futures[future]
-        if future.result():
-            print(f'"{title}" saved.')
+        # URL format: https://www.poemhunter.com/poem/poem-title/
+        page = requests.get(url)
+        if page.content:
+            dom = html.fromstring(page.content)
+
+            lines = []
+            p = dom.xpath(
+                    '/html/body/div[1]/div[6]/div[3]/div/div[1]/div[2]/div[1]/p')
+            if p:
+                lines.append(p[0].text)
+                brs = p[0].xpath('br')
+                for br in brs:
+                    if br.tail:
+                        lines.append(br.tail)
+                    else:
+                        lines.append('')
+            return lines
+        else:
+            return ""
+
+    def _format_poem(self, title, lines):
+        """Removes artifacts and appends title and author to the poem."""
+        if lines:
+            # For some reason there are a \r\n chars at the beginning of the first
+            # line and in the last line and at the end of the second last line line,
+            # so trim these.
+            lines[0] = lines[0].lstrip()
+            lines[-1] = lines[-1].strip()
+            if not lines[-1]:
+                del lines[-1]
+            lines[-1] = lines[-1].strip()
+
+            # Insert header (title), footer (poet) and blanks in between.
+            lines.insert(0, title)
+            lines.insert(1, '')
+            lines.insert(1, '')
+            lines.append('')
+            lines.append('')
+            lines.append(self.poet)
+        return lines
+
+    def _save_poem(self, title, poem):
+        """Writes poem to a file."""
+        with open(self.dest + '/' + title, 'w') as f:
+            for line in poem:
+                f.write(line + '\n')
 
 
 if __name__ == "__main__":
@@ -156,4 +165,5 @@ if __name__ == "__main__":
         print(f'"{args.dest}" is not a valid path.')
         sys.exit(-1)
 
-    run(args.poet, args.dest, args.concurrency)
+    poem_hunter = PoemHunter(args.poet, args.dest, args.concurrency)
+    poem_hunter.run()
