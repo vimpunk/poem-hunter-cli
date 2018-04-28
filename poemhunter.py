@@ -14,6 +14,12 @@ HOST = 'https://www.poemhunter.com'
 
 class PoemHunter(object):
     def __init__(self, poet, dest, concurrency):
+        """Initializes the instance.
+
+        poet -- A string of the full name of the poet.
+        dest -- A valid path at which to save the poems.
+        concurrency -- An integer specifying how many threads should be used.
+        """
         self.poet = poet
         self.dest = dest
         self.downloaded_poems = []
@@ -25,13 +31,7 @@ class PoemHunter(object):
                 os.makedirs(self.dest)
 
     def run(self):
-        """Conccurently fetches and saves all poems of poet.
-
-        poet -- A string of the full name of the poet.
-        dest -- A valid path at which to save the poems.
-        concurrency -- An integer specifying how many threads should be used.
-        """
-
+        """Conccurently fetches and saves all poems of poet."""
         # Format poet name as used in the URL.
         poem_url_base = HOST + '/' + self.poet.lower().replace(' ', '-') + '/poems/'
         futures = {}
@@ -70,12 +70,9 @@ class PoemHunter(object):
     def download_poem(self, title, url):
         """Fetches poem from poemhunter.com and saves it.
 
-        poet -- The full name of the poet.
         title -- title of the poem
         url -- full URL of the poem
-        dest -- valid path to the directory where the poem is to be saved
         """
-
         if title in self.downloaded_poems:
             return False
 
@@ -96,10 +93,7 @@ class PoemHunter(object):
         return True
 
     def _fetch_poem(self, url):
-        """Downloads and returns each line of the poem as a separate string in
-        a list.
-        """
-
+        """Downloads and returns each line of the poem as a list of strings."""
         # URL format: https://www.poemhunter.com/poem/poem-title/
         page = requests.get(url)
         if page.content:
