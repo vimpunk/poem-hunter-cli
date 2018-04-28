@@ -135,7 +135,8 @@ class PoemHunter(object):
             lines[-1] = lines[-1].strip()
             if not lines[-1]:
                 del lines[-1]
-            lines[-1] = lines[-1].strip()
+                if lines:
+                    lines[-1] = lines[-1].strip()
 
             # Insert header (title), footer (poet) and blanks in between.
             lines.insert(0, title)
