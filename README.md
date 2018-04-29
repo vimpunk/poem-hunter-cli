@@ -15,6 +15,9 @@ a lot better if more effort were to be put into it.
 As far as I could tell, there is no official API, so if you use this, please don't abuse it. It was made for the
 occasional personal use.
 
+## Dependencies
+requests, lxml
+
 ## Usage
 To get help:
 ```bash
@@ -27,7 +30,7 @@ To download all works of a single artist:
 ```bash
 ./poemhunter.py poet 'John Keats' /path/to/poems/folder
 ```
-To download all works of the top 100 artists on pomehunter.com:
+To download all works of the top 100 artists on poemhunter.com:
 ```bash
 ./poemhunter.py top 100 /path/to/poems/folder
 ```

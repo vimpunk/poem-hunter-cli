@@ -38,7 +38,7 @@ class PoemHunter(object):
                 os.makedirs(self.dest)
 
     def run(self):
-        """Conccurently fetches and saves all poems of poet."""
+        """Conccurently fetches and saves all poems of self.poet."""
         # Format poet name as used in the URL.
         poem_url_base = HOST + '/' + self.poet.lower().replace(' ', '-') + '/poems/'
         futures = {}
@@ -244,4 +244,7 @@ if __name__ == '__main__':
     if not os.path.exists(args.dest):
         print(f'"{args.dest}" is not a valid path.')
         sys.exit(-1)
+    if args.concurrency < 1:
+        print('Concurrency must be at least 1')
+        sys.exit(-2)
     args.func(args)
